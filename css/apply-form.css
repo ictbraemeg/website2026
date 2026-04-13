@@ -1,0 +1,992 @@
+/* ============================================================
+   MEMBERSHIP APPLICATION FORM — apply.php
+   Standalone CSS loaded only on this page.
+   ============================================================ */
+
+/* ── Layout ──────────────────────────────────────────────────── */
+.apply-section {
+    padding: 3.5rem 0 6rem;
+}
+
+.apply-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 2.5rem;
+    align-items: start;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────── */
+.apply-sidebar {
+    position: sticky;
+    top: 90px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.apply-sidebar__block {
+    background: var(--color-off-white);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 1.4rem;
+}
+
+.apply-sidebar__block--green {
+    background: var(--color-green-light);
+    border-color: var(--color-green-mid);
+}
+
+.apply-sidebar__block--mpesa {
+    background: var(--color-dark);
+    border-color: var(--color-dark);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.apply-sidebar__title {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    color: var(--color-dark);
+    margin: 0.4rem 0 0.85rem;
+}
+
+.apply-sidebar__sub {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--color-dark);
+    margin-bottom: 0.75rem;
+}
+
+.apply-sidebar__block--mpesa .apply-sidebar__sub {
+    color: var(--color-green-bright);
+}
+
+.apply-sidebar__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.apply-sidebar__list li {
+    font-size: 0.83rem;
+    color: var(--color-text);
+    padding-left: 0.75rem;
+    border-left: 2px solid var(--color-green-bright);
+    line-height: 1.5;
+}
+
+.apply-sidebar__checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.apply-sidebar__checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.83rem;
+    color: var(--color-green-deep);
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.apply-sidebar__checklist svg {
+    width: 15px;
+    height: 15px;
+    stroke: var(--color-green-mid);
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.mpesa-detail {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.82rem;
+}
+.mpesa-detail:last-child {
+    border-bottom: none;
+}
+.mpesa-detail span {
+    color: rgba(255, 255, 255, 0.55);
+}
+.mpesa-detail strong {
+    color: var(--color-green-bright);
+}
+
+/* Progress tracker */
+.apply-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+.apply-progress__item {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    padding: 0.35rem 0.65rem;
+    border-radius: var(--radius-sm);
+    border-left: 2px solid var(--color-border);
+    transition: all var(--transition);
+    cursor: default;
+}
+.apply-progress__item.is-done {
+    color: var(--color-green-deep);
+    border-left-color: var(--color-green-bright);
+    background: var(--color-green-light);
+    font-weight: 600;
+}
+.apply-progress__item.is-done::before {
+    content: "✓ ";
+    color: var(--color-green-mid);
+}
+
+/* ── Form card ───────────────────────────────────────────────── */
+.apply-form-card {
+    background: var(--color-white);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+}
+
+.apply-form-card__header {
+    background: linear-gradient(
+        135deg,
+        var(--color-green-deep),
+        var(--color-green-mid)
+    );
+    padding: 1.75rem 2rem;
+}
+
+.apply-form-card__logo-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.apply-form-card__logo {
+    height: 52px;
+    width: auto;
+    filter: brightness(0) invert(1);
+    opacity: 0.9;
+}
+
+.apply-form-card__address {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.6);
+    line-height: 1.6;
+}
+
+.apply-form-card__title {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    color: var(--color-white);
+    text-align: center;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-decoration: underline;
+}
+
+.apply-form-card__instructions {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-sm);
+    padding: 0.85rem 1rem;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-style: italic;
+    text-align: center;
+}
+
+.apply-form-card__instructions a {
+    color: var(--color-green-bright);
+}
+
+/* Alerts */
+.apply-alert {
+    margin: 1rem 1.5rem 0;
+    padding: 0.9rem 1.1rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.88rem;
+    line-height: 1.6;
+}
+.apply-alert[hidden] {
+    display: none;
+}
+.apply-alert--error {
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    color: #b91c1c;
+}
+.apply-alert--warning {
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    color: #92400e;
+}
+.apply-alert--warning a {
+    color: var(--color-green-mid);
+    font-weight: 600;
+}
+
+/* ── Section fieldsets ───────────────────────────────────────── */
+.af-section {
+    border: none;
+    border-top: 3px solid var(--color-green-deep);
+    margin: 0;
+    padding: 0;
+}
+
+.af-section + .af-section {
+    border-top: 1px solid var(--color-border);
+}
+
+.af-section__legend {
+    display: block;
+    width: 100%;
+    background: var(--color-green-deep);
+    color: var(--color-white);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.7rem 1.5rem;
+}
+
+.af-section__legend-sub {
+    font-weight: 400;
+    font-size: 0.76rem;
+    text-transform: none;
+    letter-spacing: 0;
+    color: rgba(255, 255, 255, 0.7);
+    margin-left: 0.5rem;
+}
+
+.af-section__intro {
+    padding: 0.85rem 1.5rem 0;
+    font-size: 0.88rem;
+    color: var(--color-text);
+    font-weight: 500;
+}
+
+/* ── Form grid rows ──────────────────────────────────────────── */
+.af-row {
+    display: grid;
+    gap: 0;
+    padding: 0.75rem 1.5rem 0;
+}
+.af-row--full {
+    grid-template-columns: 1fr;
+}
+.af-row--2 {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+}
+.af-row--3 {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1.25rem;
+}
+.af-row:last-of-type {
+    padding-bottom: 1.25rem;
+}
+
+.af-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.af-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-text);
+    letter-spacing: 0.02em;
+}
+
+.af-input {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    background: var(--color-off-white);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    font-size: 0.88rem;
+    font-family: var(--font-body);
+    transition:
+        border-color var(--transition),
+        box-shadow var(--transition),
+        background var(--transition);
+    outline: none;
+}
+
+.af-input::placeholder {
+    color: #b0bcb5;
+}
+
+.af-input:focus {
+    border-color: var(--color-green-mid);
+    background: var(--color-white);
+    box-shadow: 0 0 0 3px rgba(26, 122, 74, 0.1);
+}
+
+.af-input:invalid:not(:placeholder-shown) {
+    border-color: #fca5a5;
+}
+
+.af-input--table {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.82rem;
+    border-radius: 4px;
+}
+
+/* ── Beneficiary table ───────────────────────────────────────── */
+.af-table-wrapper {
+    padding: 0.75rem 1.5rem;
+    overflow-x: auto;
+}
+
+.af-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+
+.af-table th {
+    background: var(--color-green-light);
+    color: var(--color-green-deep);
+    padding: 0.5rem 0.6rem;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border: 1px solid var(--color-border);
+}
+
+.af-table td {
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--color-border);
+    vertical-align: middle;
+}
+
+.af-table tr:nth-child(even) td {
+    background: var(--color-off-white);
+}
+.af-table__num {
+    text-align: center;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    width: 28px;
+}
+
+.af-note {
+    padding: 0.5rem 1.5rem 0.85rem;
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.af-allocation-check {
+    padding: 0.4rem 1.5rem 0.75rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--color-green-deep);
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+.af-allocation-check__warn {
+    color: #b91c1c;
+}
+
+/* ── Remittances ─────────────────────────────────────────────── */
+.af-payment-methods {
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 2rem;
+    align-items: flex-start;
+}
+
+.af-checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    font-size: 0.88rem;
+    color: var(--color-text);
+    cursor: pointer;
+    line-height: 1.4;
+}
+
+.af-checkbox-label--large {
+    font-size: 0.88rem;
+}
+
+.af-checkbox {
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid var(--color-green-mid);
+    border-radius: 3px;
+    accent-color: var(--color-green-mid);
+    flex-shrink: 0;
+    margin-top: 2px;
+    cursor: pointer;
+}
+
+.af-conditional {
+    padding: 0 1.5rem 0.5rem;
+    display: none;
+}
+.af-conditional.is-visible {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.af-input--inline {
+    max-width: 220px;
+}
+
+.af-remit-block {
+    padding: 0.75rem 1.5rem;
+    border-top: 1px dashed var(--color-border);
+}
+.af-remit-block__title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--color-dark);
+    margin-bottom: 0.65rem;
+    text-decoration: underline;
+}
+.af-remit-block__title small {
+    font-weight: 500;
+    text-decoration: none;
+    color: var(--color-text-muted);
+}
+.af-remit-block__sub {
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+    margin: 0.4rem 0 0.65rem;
+}
+.af-remit-block--total {
+    background: var(--color-off-white);
+}
+
+.af-savings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+/* ── Consent table ───────────────────────────────────────────── */
+.af-consent-table-wrapper {
+    padding: 0.75rem 1.5rem;
+    overflow-x: auto;
+}
+
+.af-consent-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+}
+.af-consent-table th {
+    background: var(--color-green-light);
+    color: var(--color-green-deep);
+    padding: 0.6rem 1rem;
+    text-align: left;
+    border: 1px solid var(--color-border);
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+.af-consent-table td {
+    padding: 0.65rem 1rem;
+    border: 1px solid var(--color-border);
+}
+.af-consent-table tr:nth-child(even) td {
+    background: var(--color-off-white);
+}
+.af-consent-table__radio {
+    text-align: center;
+}
+.af-consent-table__tick {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--color-border);
+    border-radius: 6px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    background: var(--color-white);
+    transition:
+        background var(--transition),
+        border-color var(--transition);
+    /* No color here — ::after sets its own explicit color */
+}
+
+/* Consent YES — checked */
+input[type="radio"]:checked + .af-consent-table__tick {
+    background: var(--color-green-light);
+    border-color: var(--color-green-mid);
+    border-width: 2px;
+}
+input[type="radio"]:checked + .af-consent-table__tick::after {
+    content: "✓";
+    color: #166534; /* explicit, not inherited */
+    font-size: 1.1rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
+/* Consent NO — checked */
+.af-consent-table__tick--no {
+    /* same base as above — no override needed */
+}
+input[type="radio"]:checked + .af-consent-table__tick--no {
+    background: #fef2f2;
+    border-color: #f87171;
+    border-width: 2px;
+}
+input[type="radio"]:checked + .af-consent-table__tick--no::after {
+    content: "✗";
+    color: #dc2626; /* explicit, not inherited */
+    font-size: 1.1rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
+/* Hide actual radio input visually but keep it accessible */
+.af-consent-table__radio label {
+    display: flex;
+    justify-content: center;
+    cursor: pointer;
+}
+.af-consent-table__radio input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+/* ── Newsletter & Declaration ────────────────────────────────── */
+.af-section--newsletter,
+.af-section--declaration {
+    background: var(--color-off-white);
+}
+
+.af-newsletter-confirm {
+    padding: 1rem 1.5rem 0;
+}
+
+.af-newsletter-confirm--second {
+    padding-top: 0.75rem;
+    padding-bottom: 0.5rem;
+}
+
+.af-declaration-text {
+    padding: 1rem 1.5rem;
+    font-size: 0.9rem;
+    font-style: italic;
+    color: var(--color-text);
+    border-left: 3px solid var(--color-green-bright);
+    margin: 0.75rem 1.5rem 0;
+    background: var(--color-white);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+/* Fix 2: space between declaration body text and its checkbox */
+.af-declaration-checkbox {
+    padding: 1.1rem 1.5rem 1.25rem;
+    border-top: 1px dashed var(--color-border);
+    margin-top: 0.85rem;
+}
+
+/* ── File uploads ────────────────────────────────────────────── */
+.af-uploads-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+    padding: 1rem 1.5rem 1.5rem;
+}
+
+.af-upload-input {
+    display: none;
+}
+
+.af-upload-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.5rem 1rem;
+    border: 2px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    text-align: center;
+    transition:
+        border-color var(--transition),
+        background var(--transition);
+    background: var(--color-off-white);
+}
+
+.af-upload-label:hover,
+.af-upload-item.has-file .af-upload-label {
+    border-color: var(--color-green-mid);
+    background: var(--color-green-light);
+}
+
+.af-upload-icon {
+    width: 44px;
+    height: 44px;
+    background: var(--color-green-light);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.af-upload-icon svg {
+    width: 22px;
+    height: 22px;
+    stroke: var(--color-green-mid);
+}
+.af-upload-icon--photo {
+    background: #dbeafe;
+}
+.af-upload-icon--photo svg {
+    stroke: #1d4ed8;
+}
+
+.af-upload-label__title {
+    font-weight: 700;
+    font-size: 0.83rem;
+    color: var(--color-dark);
+}
+.af-upload-label__hint {
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+}
+
+.af-upload-label__btn {
+    background: var(--color-green-mid);
+    color: var(--color-white);
+    padding: 0.35rem 1rem;
+    border-radius: 100px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-top: 0.25rem;
+}
+
+.af-upload-label__chosen {
+    font-size: 0.75rem;
+    color: var(--color-green-deep);
+    font-weight: 600;
+    word-break: break-all;
+    min-height: 1em;
+}
+
+.af-photo-preview {
+    margin-top: 0.5rem;
+    text-align: center;
+}
+.af-photo-preview img {
+    max-height: 80px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+}
+
+/* ── Submit ──────────────────────────────────────────────────── */
+.af-submit-row {
+    padding: 1.5rem 2rem 2rem;
+    border-top: 2px solid var(--color-green-deep);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: center;
+    text-align: center;
+}
+
+.af-submit-note {
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+    max-width: 480px;
+}
+
+.af-submit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    background: var(--color-green-mid);
+    color: var(--color-white);
+    padding: 1rem 3rem;
+    border-radius: 100px;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    box-shadow: 0 4px 20px rgba(26, 122, 74, 0.35);
+    transition:
+        background var(--transition),
+        transform var(--transition),
+        box-shadow var(--transition);
+}
+
+.af-submit-btn:hover {
+    background: var(--color-green-deep);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(26, 122, 74, 0.4);
+}
+
+.af-submit-btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ── Success modal ───────────────────────────────────────────── */
+.af-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 26, 16, 0.7);
+    backdrop-filter: blur(6px);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+}
+.af-modal-overlay[hidden] {
+    display: none;
+}
+
+.af-modal {
+    background: var(--color-white);
+    border-radius: var(--radius-lg);
+    padding: 3rem 2.5rem;
+    max-width: 580px;
+    width: 100%;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+    animation: modal-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes modal-in {
+    from {
+        opacity: 0;
+        transform: scale(0.88) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.af-modal__icon {
+    width: 72px;
+    height: 72px;
+    background: var(--color-green-light);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.25rem;
+}
+.af-modal__icon svg {
+    width: 36px;
+    height: 36px;
+    stroke: var(--color-green-mid);
+}
+
+.af-modal__title {
+    font-family: var(--font-display);
+    font-size: 1.8rem;
+    color: var(--color-dark);
+    margin-bottom: 0.85rem;
+}
+
+.af-modal__body {
+    font-size: 0.92rem;
+    color: var(--color-text);
+    line-height: 1.75;
+    margin-bottom: 1rem;
+}
+
+.af-modal__ref {
+    background: var(--color-green-light);
+    border: 1px solid var(--color-green-bright);
+    border-radius: var(--radius-sm);
+    padding: 0.7rem 1.25rem;
+    font-size: 0.85rem;
+    color: var(--color-green-deep);
+    margin-bottom: 1rem;
+    font-family: monospace;
+    letter-spacing: 0.08em;
+}
+
+.af-modal__note {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    line-height: 1.65;
+    background: var(--color-off-white);
+    border-radius: var(--radius-sm);
+    padding: 0.85rem;
+    margin-bottom: 1.5rem;
+    text-align: left;
+}
+
+.af-modal__actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+    .apply-layout {
+        grid-template-columns: 240px 1fr;
+    }
+    .af-uploads-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 860px) {
+    .apply-layout {
+        grid-template-columns: 1fr;
+    }
+    .apply-sidebar {
+        position: static;
+    }
+    .af-row--3 {
+        grid-template-columns: 1fr 1fr;
+    }
+    .af-uploads-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 560px) {
+    .af-row--2,
+    .af-row--3 {
+        grid-template-columns: 1fr;
+    }
+    .af-savings-grid {
+        grid-template-columns: 1fr;
+    }
+    .apply-form-card__logo-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .af-payment-methods {
+        flex-direction: column;
+        gap: 0.6rem;
+    }
+}
+
+/* ── Dynamic beneficiary rows ────────────────────────────────── */
+.af-table th:last-child,
+.af-table td.af-table__action {
+    width: 36px;
+    text-align: center;
+    padding: 4px;
+}
+
+.ben-remove-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: 1.5px solid #fca5a5;
+    border-radius: 50%;
+    background: #fef2f2;
+    color: #dc2626;
+    cursor: pointer;
+    transition:
+        background var(--transition),
+        border-color var(--transition);
+    flex-shrink: 0;
+}
+
+.ben-remove-btn:hover {
+    background: #dc2626;
+    border-color: #dc2626;
+    color: #fff;
+}
+
+.ben-row__placeholder {
+    display: inline-block;
+    width: 26px;
+    height: 26px;
+}
+
+.ben-add-row {
+    padding: 0.5rem 1.5rem 0.25rem;
+}
+
+.ben-add-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1.1rem;
+    border: 1.5px dashed var(--color-green-mid);
+    border-radius: 100px;
+    background: transparent;
+    color: var(--color-green-mid);
+    font-family: var(--font-body);
+    font-size: 0.83rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background var(--transition),
+        color var(--transition),
+        border-style var(--transition);
+}
+
+.ben-add-btn:hover {
+    background: var(--color-green-light);
+    border-style: solid;
+    color: var(--color-green-deep);
+}
+
+/* New rows added by JS get a subtle highlight */
+.ben-row--new {
+    animation: row-appear 0.25s ease both;
+}
+
+@keyframes row-appear {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ── Invalid field highlight (shown on submit with errors) ────── */
+.af-input--highlight {
+    border-color: #dc2626 !important;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18) !important;
+    animation: field-pulse 0.4s ease 2;
+}
+
+@keyframes field-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.35);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(220, 38, 38, 0.15);
+    }
+    100% {
+        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
+    }
+}
