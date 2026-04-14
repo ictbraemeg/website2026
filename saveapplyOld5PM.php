@@ -7,14 +7,17 @@
 
 declare(strict_types=1);
 
+/* ── Output buffer: catch any stray PHP notices before JSON ──── */
 ob_start();
 
+/* Suppress display of errors — log them instead */
 ini_set("display_errors", "0");
 ini_set("log_errors", "1");
 error_reporting(E_ALL);
 
 date_default_timezone_set("Africa/Nairobi");
 
+/* JSON header */
 header("Content-Type: application/json");
 
 function json_exit(array $payload, int $code = 200): void
@@ -25,6 +28,7 @@ function json_exit(array $payload, int $code = 200): void
     exit();
 }
 
+/* ── Log JSON errors to file ─────────────────────────────────── */
 function log_json_error(array $payload, int $code = 400): void
 {
     $logDir = __DIR__ . "/logs";
@@ -44,6 +48,7 @@ function log_json_error(array $payload, int $code = 400): void
     @file_put_contents($logDir . "/apply_errors.log", $line, FILE_APPEND);
 }
 
+/* ── Fatal error handler so JS always gets JSON ─────────────── */
 register_shutdown_function(function () {
     $err = error_get_last();
     if (
@@ -66,12 +71,17 @@ register_shutdown_function(function () {
     }
 });
 
+/* ── Turn On by uncommenting to see the error in the network tab ─────────────── */
+// ini_set("display_errors", "1");
+// error_reporting(E_ALL);
+
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     $payload = ["status" => "error", "message" => "Method not allowed"];
     log_json_error($payload, 405);
     json_exit($payload, 405);
 }
 
+/* ── Session + CSRF validation ──────────────────────────────── */
 session_start();
 
 $postedToken = $_POST["csrf_token"] ?? "";
@@ -91,8 +101,9 @@ if (
     json_exit($payload, 403);
 }
 
-/* Honeypot */
+/* ── Honeypot check (bot safeguard) ─────────────────────────── */
 $hp_field = trim($_POST["hp_field"] ?? "");
+
 if ($hp_field !== "") {
     $payload = [
         "status" => "error",
@@ -103,30 +114,30 @@ if ($hp_field !== "") {
     json_exit($payload, 403);
 }
 
-/* Bootstrap */
+/* ── Bootstrap app + mail + crypto ──────────────────────────── */
 require_once __DIR__ . "/config/shikisho.php";
 require_once __DIR__ . "/config/mail.php";
-require_once __DIR__ . "/config/crypto.php"; // enc/dec [web:143]
+require_once __DIR__ . "/config/crypto.php"; // enc()/dec() for DB columns
 require_once __DIR__ . "/vendor/autoload.php";
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
+/* ── Helper: sanitise text field ────────────────────────────── */
 function sf(string $key, bool $upper = false): string
 {
     $v = trim(strip_tags($_POST[$key] ?? ""));
     return $upper ? strtoupper($v) : $v;
 }
 
-/* Collect fields */
+/* ── Collect all fields ─────────────────────────────────────── */
 $fullname = sf("fullname");
 $idno = sf("idno");
-$dob = sf("dob"); // from form, e.g. Y-m-d
+$dob = sf("dob");
 $gender = sf("gender");
 $mobile = sf("mobile");
 $email = trim(filter_input(INPUT_POST, "email", FILTER_SANITIZE_EMAIL));
 $kra_pin = sf("kra_pin", true);
-
 $marital_status = sf("marital_status");
 $residence = sf("residence");
 $postal_address = sf("postal_address");
@@ -150,7 +161,6 @@ $kin_mobile = sf("kin_mobile");
 $payment_methods = isset($_POST["payment_method"])
     ? (array) $_POST["payment_method"]
     : [];
-
 $payroll_no = sf("payroll_no");
 $capital_shares = sf("capital_shares");
 $savings_total = sf("savings_total");
@@ -166,9 +176,10 @@ $consent_2 = sf("consent_2");
 $newsletter = sf("newsletter_opt_in");
 $declaration = sf("declaration");
 
+/* MySQL datetime format */
 $dateadded = date("Y-m-d H:i:s");
 
-/* Beneficiaries (plaintext in PHP, encrypted as JSON blob later) */
+/* Beneficiaries — arrays ben_name[], ben_relationship[] etc. */
 $beneficiaries = [];
 $ben_names = (array) ($_POST["ben_name"] ?? []);
 $ben_rels = (array) ($_POST["ben_relationship"] ?? []);
@@ -182,13 +193,14 @@ foreach ($ben_names as $i => $bn) {
             "name" => trim(strip_tags($bn)),
             "relationship" => trim(strip_tags($ben_rels[$i] ?? "")),
             "allocation" => (int) ($ben_allocs[$i] ?? 0),
+            // JSON snapshot stays plaintext
             "idno" => trim(strip_tags($ben_idnos[$i] ?? "")),
             "mobile" => trim(strip_tags($ben_mobiles[$i] ?? "")),
         ];
     }
 }
 
-/* Validation */
+/* ── Validate required fields ───────────────────────────────── */
 $errors = [];
 if (!$fullname) {
     $errors[] = "Full name is required.";
@@ -251,14 +263,14 @@ if (!empty($errors)) {
     json_exit($payload, 400);
 }
 
-/* Basic mail header injection guard */
+/* Injection guard */
 if (preg_match('/(\n|\r|\t|%0A|%0D|%08|%09)/i', $email)) {
     $payload = ["status" => "error", "message" => "Invalid input detected."];
     log_json_error($payload, 400);
     json_exit($payload, 400);
 }
 
-/* Duplicate check (assumes email column is still plaintext) */
+/* ── Duplicate check (by email, DB is still plaintext email) ── */
 $chk = $dbc->prepare("SELECT PID FROM tbl_membership WHERE email = :e LIMIT 1");
 $chk->execute([":e" => $email]);
 if ($chk->rowCount() > 0) {
@@ -267,7 +279,7 @@ if ($chk->rowCount() > 0) {
     json_exit($payload);
 }
 
-/* Uploads */
+/* ── Handle file uploads ────────────────────────────────────── */
 $upload_dir = __DIR__ . "/uploads/membership/";
 if (!is_dir($upload_dir)) {
     mkdir($upload_dir, 0755, true);
@@ -373,7 +385,7 @@ if (!empty($upload_errors)) {
     json_exit($payload, 400);
 }
 
-/* Application snapshot (plaintext in PHP, encrypted as one blob on disk) */
+/* ── Persist full application as JSON (PLAINTEXT) ───────────── */
 $app_data = [
     "ref" => $ref,
     "dateadded" => $dateadded,
@@ -433,12 +445,12 @@ $app_data = [
     ],
 ];
 
-/* Encrypt full JSON before writing to disk [web:196] */
-$app_json = json_encode($app_data, JSON_PRETTY_PRINT);
-$enc_json = enc($app_json);
-file_put_contents($app_dir . "application.json", $enc_json);
+file_put_contents(
+    $app_dir . "application.json",
+    json_encode($app_data, JSON_PRETTY_PRINT),
+);
 
-/* Save summary row to tbl_membership (encrypted fields) */
+/* ── Save summary row to tbl_membership (ENCRYPTED fields) ──── */
 $name_parts = explode(" ", $fullname, 2);
 $db_surname = strtoupper($name_parts[0] ?? $fullname);
 $db_othername_plain = strtoupper($name_parts[1] ?? "");
@@ -462,14 +474,14 @@ $stmt->execute([
     ":added" => $dateadded,
 ]);
 
-/* Build print URL */
+/* ── Build print URL ────────────────────────────────────────── */
 $protocol =
     !empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off" ? "https" : "http";
 $host = $_SERVER["HTTP_HOST"];
 $print_url =
     $protocol . "://" . $host . "/print-application.php?ref=" . urlencode($ref);
 
-/* Mail helper */
+/* ── Email helper using PHPMailer (Composer) ────────────────── */
 function send_mail(
     string $to,
     string $to_name,
