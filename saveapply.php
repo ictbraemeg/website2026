@@ -71,6 +71,10 @@ register_shutdown_function(function () {
     }
 });
 
+/* ── Turn On by uncommenting to see the error in the network tab ─────────────── */
+// ini_set("display_errors", "1");
+// error_reporting(E_ALL);
+
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     $payload = ["status" => "error", "message" => "Method not allowed"];
     log_json_error($payload, 405);
@@ -82,8 +86,6 @@ session_start();
 
 $postedToken = $_POST["csrf_token"] ?? "";
 $sessionToken = $_SESSION["csrf_token"] ?? "";
-
-error_log("CSRF DEBUG posted=" . $postedToken . " session=" . $sessionToken);
 
 if (
     empty($postedToken) ||
@@ -112,9 +114,10 @@ if ($hp_field !== "") {
     json_exit($payload, 403);
 }
 
-/* ── Bootstrap app + mail ───────────────────────────────────── */
+/* ── Bootstrap app + mail + crypto ──────────────────────────── */
 require_once __DIR__ . "/config/shikisho.php";
 require_once __DIR__ . "/config/mail.php";
+require_once __DIR__ . "/config/crypto.php"; // enc()/dec() for DB columns
 require_once __DIR__ . "/vendor/autoload.php";
 
 use PHPMailer\PHPMailer\PHPMailer;
@@ -190,6 +193,7 @@ foreach ($ben_names as $i => $bn) {
             "name" => trim(strip_tags($bn)),
             "relationship" => trim(strip_tags($ben_rels[$i] ?? "")),
             "allocation" => (int) ($ben_allocs[$i] ?? 0),
+            // JSON snapshot stays plaintext
             "idno" => trim(strip_tags($ben_idnos[$i] ?? "")),
             "mobile" => trim(strip_tags($ben_mobiles[$i] ?? "")),
         ];
@@ -266,12 +270,11 @@ if (preg_match('/(\n|\r|\t|%0A|%0D|%08|%09)/i', $email)) {
     json_exit($payload, 400);
 }
 
-/* ── Duplicate check ────────────────────────────────────────── */
+/* ── Duplicate check (by email, DB is still plaintext email) ── */
 $chk = $dbc->prepare("SELECT PID FROM tbl_membership WHERE email = :e LIMIT 1");
 $chk->execute([":e" => $email]);
 if ($chk->rowCount() > 0) {
     $payload = ["status" => "duplicate"];
-    // Optional: log duplicates as 409
     log_json_error($payload, 409);
     json_exit($payload);
 }
@@ -382,33 +385,41 @@ if (!empty($upload_errors)) {
     json_exit($payload, 400);
 }
 
-/* ── Persist full application as JSON ───────────────────────── */
+/* ── Persist full application as JSON (PLAINTEXT) ───────────── */
 $app_data = [
     "ref" => $ref,
     "dateadded" => $dateadded,
-    "member" => compact(
-        "fullname",
-        "idno",
-        "dob",
-        "gender",
-        "mobile",
-        "email",
-        "kra_pin",
-        "marital_status",
-        "residence",
-        "postal_address",
-        "postal_code",
-        "town",
-    ),
-    "employment" => compact(
-        "employer",
-        "emp_no",
-        "designation",
-        "emp_terms",
-        "campus",
-    ),
-    "bank" => compact("bank_name", "bank_account", "bank_branch"),
-    "kin" => compact("kin_name", "kin_relationship", "kin_mobile"),
+    "member" => [
+        "fullname" => $fullname,
+        "idno" => $idno,
+        "dob" => $dob,
+        "gender" => $gender,
+        "mobile" => $mobile,
+        "email" => $email,
+        "kra_pin" => $kra_pin,
+        "marital_status" => $marital_status,
+        "residence" => $residence,
+        "postal_address" => $postal_address,
+        "postal_code" => $postal_code,
+        "town" => $town,
+    ],
+    "employment" => [
+        "employer" => $employer,
+        "emp_no" => $emp_no,
+        "designation" => $designation,
+        "emp_terms" => $emp_terms,
+        "campus" => $campus,
+    ],
+    "bank" => [
+        "bank_name" => $bank_name,
+        "bank_account" => $bank_account,
+        "bank_branch" => $bank_branch,
+    ],
+    "kin" => [
+        "kin_name" => $kin_name,
+        "kin_relationship" => $kin_relationship,
+        "kin_mobile" => $kin_mobile,
+    ],
     "beneficiaries" => $beneficiaries,
     "remittances" => [
         "payment_methods" => $payment_methods,
@@ -439,10 +450,10 @@ file_put_contents(
     json_encode($app_data, JSON_PRETTY_PRINT),
 );
 
-/* ── Save summary row to tbl_membership ─────────────────────── */
+/* ── Save summary row to tbl_membership (ENCRYPTED fields) ──── */
 $name_parts = explode(" ", $fullname, 2);
 $db_surname = strtoupper($name_parts[0] ?? $fullname);
-$db_othername = strtoupper($name_parts[1] ?? "");
+$db_othername_plain = strtoupper($name_parts[1] ?? "");
 
 $stmt = $dbc->prepare(
     'INSERT INTO tbl_membership
@@ -452,10 +463,10 @@ $stmt = $dbc->prepare(
 );
 $stmt->execute([
     ":surname" => $db_surname,
-    ":oname" => $db_othername,
-    ":idno" => $idno,
-    ":email" => $email,
-    ":mobile" => $mobile,
+    ":oname" => enc($db_othername_plain),
+    ":idno" => enc($idno),
+    ":email" => enc($email),
+    ":mobile" => enc($mobile),
     ":postal" => $postal_address,
     ":resi" => $residence,
     ":career" => $emp_terms,
@@ -488,7 +499,7 @@ function send_mail(
         if (MAIL_AUTH) {
             $mail->Username = MAIL_USERNAME;
             $mail->Password = MAIL_PASSWORD;
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; // adjust for live if needed
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         }
 
         $mail->setFrom(MAIL_FROM, MAIL_FROM_NAME);

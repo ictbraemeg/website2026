@@ -6,3 +6,5 @@
 [2026-04-14 13:25:36] 403 POST /saveapply.php {"status":"error","message":"Suspicious submission detected. Please fill the form manually."}
 [2026-04-14 13:28:36] 403 POST /saveapply.php {"status":"error","message":"Suspicious submission detected. Please fill the form manually."}
 [2026-04-14 13:31:16] 409 POST /saveapply.php {"status":"duplicate"}
+[2026-04-14 17:18:22] 500 POST /saveapply.php {"status":"error","message":"A server error occurred. Please try again or contact us on +254 724 053 548."}
+[2026-04-14 17:21:23] 500 POST /saveapply.php {"status":"error","message":"A server error occurred. Please try again or contact us on +254 724 053 548."}

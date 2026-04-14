@@ -5,44 +5,97 @@
  * Accessed via ?ref=YYYYMMDD_XXXXXXXX
  * Renders the exact PDF layout with all data populated.
  */
-$ref = preg_replace('/[^A-Z0-9_]/', '', strtoupper($_GET['ref'] ?? ''));
-if (!$ref) { header('Location: apply.php'); exit; }
 
-$data_file = __DIR__ . '/uploads/membership/' . $ref . '/application.json';
+$ref = preg_replace("/[^A-Z0-9_]/", "", strtoupper($_GET["ref"] ?? ""));
+if (!$ref) {
+    header("Location: apply.php");
+    exit();
+}
+
+$data_file = __DIR__ . "/uploads/membership/" . $ref . "/application.json";
 if (!file_exists($data_file)) {
     http_response_code(404);
     echo '<!DOCTYPE html><html><body><p>Application not found. Please <a href="apply.php">apply again</a>.</p></body></html>';
-    exit;
+    exit();
 }
 
-$d = json_decode(file_get_contents($data_file), true);
-if (!$d) { http_response_code(500); exit('Could not read application data.'); }
-
-$m  = $d['member']      ?? [];
-$em = $d['employment']  ?? [];
-$b  = $d['bank']        ?? [];
-$k  = $d['kin']         ?? [];
-$bn = $d['beneficiaries'] ?? [];
-$r  = $d['remittances'] ?? [];
-$c  = $d['consent']     ?? [];
-
-function v(array $arr, string $key): string {
-    return htmlspecialchars($arr[$key] ?? '', ENT_QUOTES);
+$json = file_get_contents($data_file);
+$d = json_decode($json, true); // associative array [web:151]
+if (!$d) {
+    http_response_code(500);
+    exit("Could not read application data.");
 }
 
-function consent_label(string $val): string {
-    return $val === 'yes' ? '✓ Consent' : ($val === 'no' ? '✗ Do Not Consent' : '—');
+require_once __DIR__ . "/config/crypto.php"; // provides dec()
+
+$m = $d["member"] ?? [];
+$em = $d["employment"] ?? [];
+$b = $d["bank"] ?? [];
+$k = $d["kin"] ?? [];
+$bn = $d["beneficiaries"] ?? [];
+$r = $d["remittances"] ?? [];
+$c = $d["consent"] ?? [];
+$files = $d["files"] ?? [];
+
+/**
+ * Safely escape a value from an array.
+ */
+function v(array $arr, string $key): string
+{
+    return htmlspecialchars($arr[$key] ?? "", ENT_QUOTES);
+}
+
+/**
+ * Decrypt helper that is null/empty-safe for template use.
+ */
+function vd(array $arr, string $key): string
+{
+    if (!array_key_exists($key, $arr) || $arr[$key] === "") {
+        return "";
+    }
+    return htmlspecialchars(dec($arr[$key]), ENT_QUOTES);
+}
+
+/* Decrypt member fields that were stored encrypted in application.json */
+if (isset($m["idno"])) {
+    $m["idno"] = dec($m["idno"]);
+}
+if (isset($m["mobile"])) {
+    $m["mobile"] = dec($m["mobile"]);
+}
+if (isset($m["email"])) {
+    $m["email"] = dec($m["email"]);
+}
+if (isset($m["kra_pin"])) {
+    $m["kra_pin"] = dec($m["kra_pin"]);
+}
+
+/* Decrypt kin mobile if encrypted */
+if (isset($k["kin_mobile"]) && $k["kin_mobile"] !== "") {
+    $k["kin_mobile"] = dec($k["kin_mobile"]);
+}
+
+/* Decrypt beneficiaries ID and mobile if encrypted */
+foreach ($bn as $i => $ben) {
+    if (isset($ben["idno"]) && $ben["idno"] !== "") {
+        $bn[$i]["idno"] = dec($ben["idno"]);
+    }
+    if (isset($ben["mobile"]) && $ben["mobile"] !== "") {
+        $bn[$i]["mobile"] = dec($ben["mobile"]);
+    }
 }
 
 /* Photo path */
-$photo_file = $d['files']['photo'] ?? '';
-$photo_path = '/uploads/membership/' . $ref . '/' . $photo_file;
+$photo_file = $files["photo"] ?? "";
+$photo_path = "/uploads/membership/" . $ref . "/" . $photo_file;
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Membership Application — <?php echo htmlspecialchars($d['ref'] ?? ''); ?></title>
+<title>Membership Application — <?php echo htmlspecialchars(
+    $d["ref"] ?? "",
+); ?></title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
 
@@ -281,7 +334,11 @@ $photo_path = '/uploads/membership/' . $ref . '/' . $photo_file;
     <a href="apply.php" class="print-toolbar__btn print-toolbar__btn--secondary">
         ← Back to Apply
     </a>
-    <span class="print-toolbar__ref">Ref: <?php echo htmlspecialchars($d['ref']); ?> &nbsp;|&nbsp; <?php echo htmlspecialchars($d['dateadded'] ?? ''); ?></span>
+    <span class="print-toolbar__ref">Ref: <?php echo htmlspecialchars(
+        $d["ref"],
+    ); ?> &nbsp;|&nbsp; <?php echo htmlspecialchars(
+     $d["dateadded"] ?? "",
+ ); ?></span>
 </div>
 
 <!-- ══ PAGE 1 ══════════════════════════════════════════════════ -->
@@ -308,7 +365,9 @@ $photo_path = '/uploads/membership/' . $ref . '/' . $photo_file;
 
 <?php if ($photo_file): ?>
 <div class="pf-photo-box">
-    <img src="<?php echo htmlspecialchars($photo_path); ?>" alt="Passport photo">
+    <img src="<?php echo htmlspecialchars(
+        $photo_path,
+    ); ?>" alt="Passport photo">
 </div>
 <?php else: ?>
 <div class="pf-photo-box">
@@ -323,27 +382,63 @@ $photo_path = '/uploads/membership/' . $ref . '/' . $photo_file;
         <div class="pf-row pf-row--full">
             <div class="pf-field">
                 <div class="pf-field__label">Full Name (As Per ID/Alien Card)</div>
-                <div class="pf-field__value"><?php echo v($m,'fullname'); ?></div>
+                <div class="pf-field__value"><?php echo v(
+                    $m,
+                    "fullname",
+                ); ?></div>
             </div>
         </div>
         <div class="pf-row pf-row--3">
-            <div class="pf-field"><div class="pf-field__label">ID / Alien Card No.</div><div class="pf-field__value"><?php echo v($m,'idno'); ?></div></div>
-            <div class="pf-field"><div class="pf-field__label">Date of Birth</div><div class="pf-field__value"><?php echo v($m,'dob'); ?></div></div>
-            <div class="pf-field"><div class="pf-field__label">Gender</div><div class="pf-field__value"><?php echo v($m,'gender'); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">ID / Alien Card No.</div><div class="pf-field__value"><?php echo v(
+                $m,
+                "idno",
+            ); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Date of Birth</div><div class="pf-field__value"><?php echo v(
+                $m,
+                "dob",
+            ); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Gender</div><div class="pf-field__value"><?php echo v(
+                $m,
+                "gender",
+            ); ?></div></div>
         </div>
         <div class="pf-row pf-row--2">
-            <div class="pf-field"><div class="pf-field__label">Mobile No.</div><div class="pf-field__value"><?php echo v($m,'mobile'); ?></div></div>
-            <div class="pf-field"><div class="pf-field__label">Email</div><div class="pf-field__value"><?php echo v($m,'email'); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Mobile No.</div><div class="pf-field__value"><?php echo v(
+                $m,
+                "mobile",
+            ); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Email</div><div class="pf-field__value"><?php echo v(
+                $m,
+                "email",
+            ); ?></div></div>
         </div>
         <div class="pf-row pf-row--3">
-            <div class="pf-field"><div class="pf-field__label">KRA PIN</div><div class="pf-field__value"><?php echo v($m,'kra_pin'); ?></div></div>
-            <div class="pf-field"><div class="pf-field__label">Marital Status</div><div class="pf-field__value"><?php echo v($m,'marital_status'); ?></div></div>
-            <div class="pf-field"><div class="pf-field__label">Residence</div><div class="pf-field__value"><?php echo v($m,'residence'); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">KRA PIN</div><div class="pf-field__value"><?php echo v(
+                $m,
+                "kra_pin",
+            ); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Marital Status</div><div class="pf-field__value"><?php echo v(
+                $m,
+                "marital_status",
+            ); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Residence</div><div class="pf-field__value"><?php echo v(
+                $m,
+                "residence",
+            ); ?></div></div>
         </div>
         <div class="pf-row pf-row--3">
-            <div class="pf-field"><div class="pf-field__label">Postal Address</div><div class="pf-field__value"><?php echo v($m,'postal_address'); ?></div></div>
-            <div class="pf-field"><div class="pf-field__label">Postal Code</div><div class="pf-field__value"><?php echo v($m,'postal_code'); ?></div></div>
-            <div class="pf-field"><div class="pf-field__label">Town</div><div class="pf-field__value"><?php echo v($m,'town'); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Postal Address</div><div class="pf-field__value"><?php echo v(
+                $m,
+                "postal_address",
+            ); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Postal Code</div><div class="pf-field__value"><?php echo v(
+                $m,
+                "postal_code",
+            ); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Town</div><div class="pf-field__value"><?php echo v(
+                $m,
+                "town",
+            ); ?></div></div>
         </div>
     </div>
 </div>
@@ -352,14 +447,29 @@ $photo_path = '/uploads/membership/' . $ref . '/' . $photo_file;
 <div class="pf-section">
     <div class="pf-section__head">Employment Details</div>
     <div class="pf-section__body">
-        <div class="pf-row pf-row--full"><div class="pf-field"><div class="pf-field__label">Name of Employer</div><div class="pf-field__value"><?php echo v($em,'employer'); ?></div></div></div>
+        <div class="pf-row pf-row--full"><div class="pf-field"><div class="pf-field__label">Name of Employer</div><div class="pf-field__value"><?php echo v(
+            $em,
+            "employer",
+        ); ?></div></div></div>
         <div class="pf-row pf-row--2">
-            <div class="pf-field"><div class="pf-field__label">Employment No.</div><div class="pf-field__value"><?php echo v($em,'emp_no'); ?></div></div>
-            <div class="pf-field"><div class="pf-field__label">Designation</div><div class="pf-field__value"><?php echo v($em,'designation'); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Employment No.</div><div class="pf-field__value"><?php echo v(
+                $em,
+                "emp_no",
+            ); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Designation</div><div class="pf-field__value"><?php echo v(
+                $em,
+                "designation",
+            ); ?></div></div>
         </div>
         <div class="pf-row pf-row--2">
-            <div class="pf-field"><div class="pf-field__label">Employment Terms</div><div class="pf-field__value"><?php echo v($em,'emp_terms'); ?></div></div>
-            <div class="pf-field"><div class="pf-field__label">Campus (if applicable)</div><div class="pf-field__value"><?php echo v($em,'campus'); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Employment Terms</div><div class="pf-field__value"><?php echo v(
+                $em,
+                "emp_terms",
+            ); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Campus (if applicable)</div><div class="pf-field__value"><?php echo v(
+                $em,
+                "campus",
+            ); ?></div></div>
         </div>
     </div>
 </div>
@@ -368,10 +478,19 @@ $photo_path = '/uploads/membership/' . $ref . '/' . $photo_file;
 <div class="pf-section">
     <div class="pf-section__head">Bank Details</div>
     <div class="pf-section__body">
-        <div class="pf-row pf-row--full"><div class="pf-field"><div class="pf-field__label">Name of Bank</div><div class="pf-field__value"><?php echo v($b,'bank_name'); ?></div></div></div>
+        <div class="pf-row pf-row--full"><div class="pf-field"><div class="pf-field__label">Name of Bank</div><div class="pf-field__value"><?php echo v(
+            $b,
+            "bank_name",
+        ); ?></div></div></div>
         <div class="pf-row pf-row--2">
-            <div class="pf-field"><div class="pf-field__label">Account No.</div><div class="pf-field__value"><?php echo v($b,'bank_account'); ?></div></div>
-            <div class="pf-field"><div class="pf-field__label">Branch</div><div class="pf-field__value"><?php echo v($b,'bank_branch'); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Account No.</div><div class="pf-field__value"><?php echo v(
+                $b,
+                "bank_account",
+            ); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Branch</div><div class="pf-field__value"><?php echo v(
+                $b,
+                "bank_branch",
+            ); ?></div></div>
         </div>
     </div>
 </div>
@@ -396,10 +515,19 @@ $photo_path = '/uploads/membership/' . $ref . '/' . $photo_file;
 <div class="pf-section">
     <div class="pf-section__head">Next of Kin <small style="font-weight:400;text-transform:none;">(Person to be contacted in case of emergency)</small></div>
     <div class="pf-section__body">
-        <div class="pf-row pf-row--full"><div class="pf-field"><div class="pf-field__label">Full Name</div><div class="pf-field__value"><?php echo v($k,'kin_name'); ?></div></div></div>
+        <div class="pf-row pf-row--full"><div class="pf-field"><div class="pf-field__label">Full Name</div><div class="pf-field__value"><?php echo v(
+            $k,
+            "kin_name",
+        ); ?></div></div></div>
         <div class="pf-row pf-row--2">
-            <div class="pf-field"><div class="pf-field__label">Relationship</div><div class="pf-field__value"><?php echo v($k,'kin_relationship'); ?></div></div>
-            <div class="pf-field"><div class="pf-field__label">Mobile No.</div><div class="pf-field__value"><?php echo v($k,'kin_mobile'); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Relationship</div><div class="pf-field__value"><?php echo v(
+                $k,
+                "kin_relationship",
+            ); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Mobile No.</div><div class="pf-field__value"><?php echo v(
+                $k,
+                "kin_mobile",
+            ); ?></div></div>
         </div>
     </div>
 </div>
@@ -419,17 +547,29 @@ $photo_path = '/uploads/membership/' . $ref . '/' . $photo_file;
                 $shown = 0;
                 foreach ($bn as $ben) {
                     echo '<tr>
-                        <td>' . htmlspecialchars($ben['name'] ?? '') . '</td>
-                        <td>' . htmlspecialchars($ben['relationship'] ?? '') . '</td>
-                        <td>' . htmlspecialchars($ben['allocation'] ?? '') . '%</td>
-                        <td>' . htmlspecialchars($ben['idno'] ?? '') . '</td>
-                        <td>' . htmlspecialchars($ben['mobile'] ?? '') . '</td>
+                        <td>' .
+                        htmlspecialchars($ben["name"] ?? "", ENT_QUOTES) .
+                        '</td>
+                        <td>' .
+                        htmlspecialchars(
+                            $ben["relationship"] ?? "",
+                            ENT_QUOTES,
+                        ) .
+                        '</td>
+                        <td>' .
+                        htmlspecialchars($ben["allocation"] ?? "", ENT_QUOTES) .
+                        '%</td>
+                        <td>' .
+                        htmlspecialchars($ben["idno"] ?? "", ENT_QUOTES) .
+                        '</td>
+                        <td>' .
+                        htmlspecialchars($ben["mobile"] ?? "", ENT_QUOTES) .
+                        '</td>
                     </tr>';
                     $shown++;
                 }
-                /* Pad to at least 4 rows */
                 while ($shown < 4) {
-                    echo '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>';
+                    echo "<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>";
                     $shown++;
                 }
                 ?>
@@ -459,20 +599,29 @@ $photo_path = '/uploads/membership/' . $ref . '/' . $photo_file;
         <p style="font-weight:600;margin-bottom:8px;font-size:10.5px;">This is to confirm that my monthly contribution shall be done through:</p>
         <div class="pf-checkboxes">
             <?php
-            $methods = $r['payment_methods'] ?? [];
-            $all_methods = ['Employee Check-off','Standing Order','Mobile Money Deposit','Direct Bank Deposit'];
+            $methods = $r["payment_methods"] ?? [];
+            $all_methods = [
+                "Employee Check-off",
+                "Standing Order",
+                "Mobile Money Deposit",
+                "Direct Bank Deposit",
+            ];
             foreach ($all_methods as $pm):
-                $checked = in_array($pm, $methods);
-            ?>
+                $checked = in_array($pm, $methods, true); ?>
             <div class="pf-cb">
-                <div class="pf-cb__box"><?php echo $checked ? '✓' : ''; ?></div>
-                <span><?php echo htmlspecialchars($pm); ?></span>
+                <div class="pf-cb__box"><?php echo $checked ? "✓" : ""; ?></div>
+                <span><?php echo htmlspecialchars($pm, ENT_QUOTES); ?></span>
             </div>
-            <?php endforeach; ?>
+            <?php
+            endforeach;
+            ?>
         </div>
-        <?php if (!empty($r['payroll_no'])): ?>
+        <?php if (!empty($r["payroll_no"])): ?>
         <div class="pf-row pf-row--2" style="margin-top:6px;">
-            <div class="pf-field"><div class="pf-field__label">Payroll No. (Braeburn Staff)</div><div class="pf-field__value"><?php echo v($r,'payroll_no'); ?></div></div>
+            <div class="pf-field"><div class="pf-field__label">Payroll No. (Braeburn Staff)</div><div class="pf-field__value"><?php echo v(
+                $r,
+                "payroll_no",
+            ); ?></div></div>
         </div>
         <?php endif; ?>
 
@@ -481,7 +630,10 @@ $photo_path = '/uploads/membership/' . $ref . '/' . $photo_file;
             <div class="pf-row pf-row--2">
                 <div class="pf-field">
                     <div class="pf-field__label">Monthly Contribution (KES)</div>
-                    <div class="pf-field__value"><?php echo v($r,'capital_shares'); ?></div>
+                    <div class="pf-field__value"><?php echo v(
+                        $r,
+                        "capital_shares",
+                    ); ?></div>
                 </div>
             </div>
             <p class="pf-note">Note: This monthly contribution will stop once it sums up to KES 10,000.</p>
@@ -490,13 +642,28 @@ $photo_path = '/uploads/membership/' . $ref . '/' . $photo_file;
         <div style="margin-top:10px;">
             <p style="font-weight:700;font-size:10.5px;text-decoration:underline;margin-bottom:4px;">Deposits &amp; Savings Products</p>
             <div class="pf-row pf-row--2">
-                <div class="pf-field"><div class="pf-field__label">Total Monthly Savings (KES)</div><div class="pf-field__value"><?php echo v($r,'savings_total'); ?></div></div>
+                <div class="pf-field"><div class="pf-field__label">Total Monthly Savings (KES)</div><div class="pf-field__value"><?php echo v(
+                    $r,
+                    "savings_total",
+                ); ?></div></div>
             </div>
             <div class="pf-savings-grid">
-                <div class="pf-field"><div class="pf-field__label">• Deposits</div><div class="pf-field__value"><?php echo v($r,'dep_deposits'); ?></div></div>
-                <div class="pf-field"><div class="pf-field__label">• Christmas Savings</div><div class="pf-field__value"><?php echo v($r,'dep_christmas'); ?></div></div>
-                <div class="pf-field"><div class="pf-field__label">• Holiday Savings</div><div class="pf-field__value"><?php echo v($r,'dep_holiday'); ?></div></div>
-                <div class="pf-field"><div class="pf-field__label">• TOTO Savings</div><div class="pf-field__value"><?php echo v($r,'dep_toto'); ?></div></div>
+                <div class="pf-field"><div class="pf-field__label">• Deposits</div><div class="pf-field__value"><?php echo v(
+                    $r,
+                    "dep_deposits",
+                ); ?></div></div>
+                <div class="pf-field"><div class="pf-field__label">• Christmas Savings</div><div class="pf-field__value"><?php echo v(
+                    $r,
+                    "dep_christmas",
+                ); ?></div></div>
+                <div class="pf-field"><div class="pf-field__label">• Holiday Savings</div><div class="pf-field__value"><?php echo v(
+                    $r,
+                    "dep_holiday",
+                ); ?></div></div>
+                <div class="pf-field"><div class="pf-field__label">• TOTO Savings</div><div class="pf-field__value"><?php echo v(
+                    $r,
+                    "dep_toto",
+                ); ?></div></div>
             </div>
         </div>
 
@@ -504,7 +671,10 @@ $photo_path = '/uploads/membership/' . $ref . '/' . $photo_file;
             <div class="pf-row pf-row--2">
                 <div class="pf-field">
                     <div class="pf-field__label">Total Monthly Contributions (Deposits + Capital Shares)</div>
-                    <div class="pf-field__value" style="font-size:13px;font-weight:700;"><?php echo v($r,'total_monthly'); ?></div>
+                    <div class="pf-field__value" style="font-size:13px;font-weight:700;"><?php echo v(
+                        $r,
+                        "total_monthly",
+                    ); ?></div>
                 </div>
             </div>
         </div>
@@ -556,18 +726,35 @@ $photo_path = '/uploads/membership/' . $ref . '/' . $photo_file;
             <tbody>
                 <?php
                 $consent_items = [
-                    ['label'=>'Website',                         'val'=>$c['website']      ?? ''],
-                    ['label'=>'Social Media',                    'val'=>$c['social_media'] ?? ''],
-                    ['label'=>'Brochures, Pamphlets & Handbooks','val'=>$c['brochures']   ?? ''],
+                    ["label" => "Website", "val" => $c["website"] ?? ""],
+                    [
+                        "label" => "Social Media",
+                        "val" => $c["social_media"] ?? "",
+                    ],
+                    [
+                        "label" => "Brochures, Pamphlets & Handbooks",
+                        "val" => $c["brochures"] ?? "",
+                    ],
                 ];
-                foreach ($consent_items as $ci):
-                ?>
+                foreach ($consent_items as $ci): ?>
                 <tr>
-                    <td><?php echo htmlspecialchars($ci['label']); ?></td>
-                    <td class="<?php echo $ci['val']==='yes'?'yes':''; ?>"><?php echo $ci['val']==='yes'?'✓ Consent':''; ?></td>
-                    <td class="<?php echo $ci['val']==='no'?'no':''; ?>"><?php echo $ci['val']==='no'?'✗ Do Not Consent':''; ?></td>
+                    <td><?php echo htmlspecialchars(
+                        $ci["label"],
+                        ENT_QUOTES,
+                    ); ?></td>
+                    <td class="<?php echo $ci["val"] === "yes"
+                        ? "yes"
+                        : ""; ?>"><?php echo $ci["val"] === "yes"
+    ? "✓ Consent"
+    : ""; ?></td>
+                    <td class="<?php echo $ci["val"] === "no"
+                        ? "no"
+                        : ""; ?>"><?php echo $ci["val"] === "no"
+    ? "✗ Do Not Consent"
+    : ""; ?></td>
                 </tr>
-                <?php endforeach; ?>
+                <?php endforeach;
+                ?>
             </tbody>
         </table>
     </div>
