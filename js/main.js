@@ -224,21 +224,54 @@
       submitBtn.textContent = "Sending\u2026";
       submitBtn.disabled = true;
 
-      fetch("reachToUs.php", { method: "POST", body: new FormData(form) })
+      fetch("reachToUs.php", {
+        method: "POST",
+        body: new FormData(form),
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+      })
         .then(function (res) {
           return res.text();
         })
         .then(function (txt) {
-          if (txt.indexOf("wrong_captcha") !== -1) {
+          var t = txt.trim();
+          if (t.indexOf("wrong_captcha") !== -1) {
             showError(errorEl, "Incorrect CAPTCHA code. Please try again.");
             if (captchaImg) {
               captchaImg.src = "mycaptcha.php?" + Date.now();
             }
             document.getElementById("cp-captcha").value = "";
-          } else {
+          } else if (t.indexOf("missing_fields") !== -1) {
+            showError(errorEl, "Please fill in all required fields.");
+          } else if (t.indexOf("invalid_email") !== -1) {
+            showError(errorEl, "Please enter a valid email address.");
+          } else if (
+            t.indexOf("mail_error") !== -1 ||
+            t.indexOf("server_error") !== -1
+          ) {
+            showError(
+              errorEl,
+              "Could not send your message. Please call us directly on " +
+                (document.querySelector(
+                  '.contact-detail-card__value a[href^="tel"]',
+                )
+                  ? document.querySelector(
+                      '.contact-detail-card__value a[href^="tel"]',
+                    ).textContent
+                  : "+254 724 053 548") +
+                ".",
+            );
+          } else if (t.indexOf("ok") !== -1 || t.indexOf('"status"') !== -1) {
             form.reset();
             hideEl(errorEl);
             showEl(successEl, 8000);
+            if (captchaImg) {
+              captchaImg.src = "mycaptcha.php?" + Date.now();
+            }
+          } else {
+            showError(
+              errorEl,
+              "Something went wrong. Please try again or call us directly.",
+            );
           }
         })
         .catch(function () {

@@ -1,19 +1,22 @@
 <?php
 /**
  * reachToUs.php
- * Handles the full contact form POST from contacts.php.
- * Validates CAPTCHA, sanitises inputs, sends via PHPMailer.
- *
- * Responds with:
- *   - Plain text "ok"            on success  (fetch/AJAX)
- *   - Plain text "wrong_captcha" on bad code (fetch/AJAX)
- *   - Redirect to thankYou1.php on success  (traditional POST)
- *   - Redirect to contacts.php  on failure  (traditional POST)
+ * Handles the contact form POST from contacts.php.
+ * - Validates CAPTCHA and inputs
+ * - Sends email via PHPMailer (SMTP)
+ * - For AJAX (fetch): returns plain text status strings
  */
+
+declare(strict_types=1);
+
 session_start();
 
-require_once "config/shikisho.php";
-require_once "config/mail.php";
+require_once __DIR__ . "/config/shikisho.php";
+require_once __DIR__ . "/config/mail.php";
+require_once __DIR__ . "/vendor/autoload.php"; // Composer autoloader
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
 
 date_default_timezone_set("Africa/Nairobi");
 
@@ -26,15 +29,15 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 /* ── Detect whether request is AJAX fetch ─────────────────────── */
 $is_ajax =
     !empty($_SERVER["HTTP_X_REQUESTED_WITH"]) ||
-    strpos($_SERVER["HTTP_ACCEPT"] ?? "", "application/json") !== false ||
-    isset($_SERVER["HTTP_FETCH_MODE"]);
+    isset($_SERVER["HTTP_FETCH_MODE"]) ||
+    strpos($_SERVER["HTTP_ACCEPT"] ?? "", "application/json") !== false;
 
 /* ── Validate CAPTCHA ─────────────────────────────────────────── */
 $submitted_captcha = strtoupper(trim($_POST["captcha"] ?? ""));
 $session_captcha = strtoupper($_SESSION["digit"] ?? "");
 
 if (empty($session_captcha) || $submitted_captcha !== $session_captcha) {
-    unset($_SESSION["digit"]); /* force refresh on next load */
+    unset($_SESSION["digit"]); // force refresh on next load
     if ($is_ajax) {
         http_response_code(422);
         echo "wrong_captcha";
@@ -44,7 +47,7 @@ if (empty($session_captcha) || $submitted_captcha !== $session_captcha) {
     exit();
 }
 
-unset($_SESSION["digit"]); /* consumed — prevent replay */
+unset($_SESSION["digit"]); // consumed — prevent replay
 
 /* ── Collect & sanitise ───────────────────────────────────────── */
 $name = ucwords(trim(strip_tags($_POST["name"] ?? "")));
@@ -82,7 +85,7 @@ if (preg_match('/(\n|\r|\t|%0A|%0D|%08|%09)/i', $email . $name)) {
     exit();
 }
 
-/* ── Company info ─────────────────────────────────────────────── */
+/* ── Company info (for context if needed) ─────────────────────── */
 $co_qry = $dbc->prepare(
     "SELECT * FROM tbl_company WHERE published='1' LIMIT 1",
 );
@@ -120,49 +123,57 @@ $email_body =
 </table>';
 
 /* ── Send via PHPMailer ───────────────────────────────────────── */
-include_once "phpmailer/class.phpmailer.php";
-
 $mail = new PHPMailer(true);
 
 try {
-    $mail->IsSMTP();
+    // Server settings
+    $mail->isSMTP();
     $mail->Host = MAIL_HOST;
     $mail->SMTPAuth = MAIL_AUTH;
     $mail->Port = MAIL_PORT;
-    $mail->Username = MAIL_USERNAME;
-    $mail->Password = MAIL_PASSWORD;
 
-    $mail->SetFrom(MAIL_FROM, MAIL_FROM_NAME);
-    $mail->AddReplyTo($email, $name);
-    $mail->AddAddress("info.braemegsacco@gmail.com", "Braemeg SACCO");
-    $mail->AddBCC("braemegsacco@yahoo.com");
-    $mail->AddBCC("rgitundu@gmail.com");
+    if (MAIL_AUTH) {
+        $mail->Username = MAIL_USERNAME;
+        $mail->Password = MAIL_PASSWORD;
+        // Use login by default for production; adjust if needed
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; // or PHPMailer::ENCRYPTION_SMTPS
+    }
 
+    // From / reply-to / recipients
+    $mail->setFrom(MAIL_FROM, MAIL_FROM_NAME);
+    $mail->addReplyTo($email, $name);
+
+    // Primary recipient
+    $mail->addAddress("info.braemegsacco@gmail.com", "Braemeg SACCO");
+
+    // BCCs
+    $mail->addBCC("braemegsacco@yahoo.com");
+    $mail->addBCC("rgitundu@gmail.com");
+
+    // Content
     $mail->Subject = "Website Contact: " . $subject;
-    $mail->IsHTML(true);
+    $mail->isHTML(true);
     $mail->Body = $email_body;
-    $mail->AltBody = "Contact from: {$name} <{$email}>\nPhone: {$phone}\nSubject: {$subject}\n\n{$message}\n\nDate: {$date}";
+    $mail->AltBody =
+        "Contact from: {$name} <{$email}>\n" .
+        "Phone: {$phone}\n" .
+        "Subject: {$subject}\n\n" .
+        "{$message}\n\n" .
+        "Date: {$date}";
 
-    $mail->Send();
+    $mail->send();
 
     if ($is_ajax) {
-        header("Content-Type: application/json");
-        echo json_encode(["status" => "ok"]);
+        http_response_code(200);
+        echo "ok";
     } else {
         header("Location: thankYou1.php");
     }
-} catch (phpmailerException $e) {
+} catch (Exception $e) {
     http_response_code(500);
     if ($is_ajax) {
         echo "mail_error";
     } else {
         header("Location: contacts.php?err=mail");
-    }
-} catch (Exception $e) {
-    http_response_code(500);
-    if ($is_ajax) {
-        echo "server_error";
-    } else {
-        header("Location: contacts.php?err=server");
     }
 }
