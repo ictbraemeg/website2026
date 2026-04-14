@@ -3,6 +3,13 @@
  * apply.php — Braemeg SACCO Online Membership Application
  * Mirrors the official 4-page PDF form exactly.
  */
+
+// CSRF Token
+session_start();
+if (empty($_SESSION["csrf_token"])) {
+    $_SESSION["csrf_token"] = bin2hex(random_bytes(32));
+}
+
 require_once "config/shikisho.php";
 
 $qry = $dbc->prepare("SELECT * FROM tbl_company WHERE published='1' LIMIT 1");
@@ -103,6 +110,13 @@ $breadcrumbs = [
     </div>
 
     <form id="apply-form" action="saveapply.php" method="POST" enctype="multipart/form-data" novalidate>
+
+    <input type="hidden"
+           name="csrf_token"
+           value="<?php echo htmlspecialchars(
+               $_SESSION["csrf_token"] ?? "",
+               ENT_QUOTES,
+           ); ?>">
 
     <!-- ══════════════════════════════════════════════════════
          SECTION 1: MEMBER DETAILS
@@ -564,6 +578,18 @@ $breadcrumbs = [
 
         </div>
     </fieldset>
+
+    <!-- Special field -->
+    <div class="hp-container" aria-hidden="true">
+      <label for="hp-field">Leave this field empty</label>
+      <input
+        type="text"
+        id="hp-field"
+        name="hp_field"
+        autocomplete="new-password"
+        tabindex="-1"
+      />
+    </div>
 
     <!-- Submit -->
     <div class="af-submit-row">

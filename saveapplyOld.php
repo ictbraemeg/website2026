@@ -5,8 +5,6 @@
  * Returns JSON: { status, ref, email, print_url } on success.
  */
 
-declare(strict_types=1);
-
 /* ── Output buffer: catch any stray PHP notices before JSON ──── */
 ob_start();
 
@@ -17,38 +15,21 @@ error_reporting(E_ALL);
 
 date_default_timezone_set("Africa/Nairobi");
 
-/* JSON header */
+/* Set JSON header now; ob_clean() before every echo ensures clean output */
 header("Content-Type: application/json");
 
 function json_exit(array $payload, int $code = 200): void
 {
-    ob_clean();
+    ob_clean(); /* discard any stray output accumulated so far */
     http_response_code($code);
     echo json_encode($payload);
     exit();
 }
 
-/* ── Log JSON errors to file ─────────────────────────────────── */
-function log_json_error(array $payload, int $code = 400): void
-{
-    $logDir = __DIR__ . "/logs";
-    if (!is_dir($logDir)) {
-        @mkdir($logDir, 0755, true);
-    }
-
-    $line = sprintf(
-        "[%s] %s %s %s %s\n",
-        date("Y-m-d H:i:s"),
-        $code,
-        $_SERVER["REQUEST_METHOD"] ?? "-",
-        $_SERVER["REQUEST_URI"] ?? "-",
-        json_encode($payload, JSON_UNESCAPED_UNICODE),
-    );
-
-    @file_put_contents($logDir . "/apply_errors.log", $line, FILE_APPEND);
-}
-
-/* ── Fatal error handler so JS always gets JSON ─────────────── */
+/*
+ * Shutdown handler — catches fatal errors that would otherwise produce
+ * an empty or HTML response, causing the JS fetch to show "network error".
+ */
 register_shutdown_function(function () {
     $err = error_get_last();
     if (
@@ -59,75 +40,32 @@ register_shutdown_function(function () {
             true,
         )
     ) {
-        $payload = [
+        ob_clean();
+        http_response_code(500);
+        echo json_encode([
             "status" => "error",
             "message" =>
                 "A server error occurred. Please try again or contact us on +254 724 053 548.",
-        ];
-        log_json_error($payload, 500);
-        ob_clean();
-        http_response_code(500);
-        echo json_encode($payload);
+        ]);
     }
 });
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    $payload = ["status" => "error", "message" => "Method not allowed"];
-    log_json_error($payload, 405);
-    json_exit($payload, 405);
+    json_exit(["status" => "error", "message" => "Method not allowed"], 405);
 }
 
-/* ── Session + CSRF validation ──────────────────────────────── */
-session_start();
+require_once "config/shikisho.php";
+require_once "config/mail.php";
+include_once "phpmailer/class.phpmailer.php";
 
-$postedToken = $_POST["csrf_token"] ?? "";
-$sessionToken = $_SESSION["csrf_token"] ?? "";
-
-error_log("CSRF DEBUG posted=" . $postedToken . " session=" . $sessionToken);
-
-if (
-    empty($postedToken) ||
-    empty($sessionToken) ||
-    !hash_equals($sessionToken, $postedToken)
-) {
-    $payload = [
-        "status" => "error",
-        "message" =>
-            "Security check failed. Please reload the page and try again.",
-    ];
-    log_json_error($payload, 403);
-    json_exit($payload, 403);
-}
-
-/* ── Honeypot check (bot safeguard) ─────────────────────────── */
-$hp_field = trim($_POST["hp_field"] ?? "");
-
-if ($hp_field !== "") {
-    $payload = [
-        "status" => "error",
-        "message" =>
-            "Suspicious submission detected. Please fill the form manually.",
-    ];
-    log_json_error($payload, 403);
-    json_exit($payload, 403);
-}
-
-/* ── Bootstrap app + mail ───────────────────────────────────── */
-require_once __DIR__ . "/config/shikisho.php";
-require_once __DIR__ . "/config/mail.php";
-require_once __DIR__ . "/vendor/autoload.php";
-
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
-/* ── Helper: sanitise text field ────────────────────────────── */
+/* ── Helper: sanitise a text field ──────────────────────────── */
 function sf(string $key, bool $upper = false): string
 {
     $v = trim(strip_tags($_POST[$key] ?? ""));
     return $upper ? strtoupper($v) : $v;
 }
 
-/* ── Collect all fields ─────────────────────────────────────── */
+/* ── Collect all fields ──────────────────────────────────────── */
 $fullname = sf("fullname");
 $idno = sf("idno");
 $dob = sf("dob");
@@ -170,20 +108,18 @@ $total_monthly = sf("total_monthly");
 $consent_0 = sf("consent_0");
 $consent_1 = sf("consent_1");
 $consent_2 = sf("consent_2");
+
 $newsletter = sf("newsletter_opt_in");
 $declaration = sf("declaration");
+$dateadded = date("d-m-Y H:i:s");
 
-/* MySQL datetime format */
-$dateadded = date("Y-m-d H:i:s");
-
-/* Beneficiaries — arrays ben_name[], ben_relationship[] etc. */
+/* Beneficiaries — names sent as ben_name[], ben_relationship[] etc. */
 $beneficiaries = [];
 $ben_names = (array) ($_POST["ben_name"] ?? []);
 $ben_rels = (array) ($_POST["ben_relationship"] ?? []);
 $ben_allocs = (array) ($_POST["ben_allocation"] ?? []);
 $ben_idnos = (array) ($_POST["ben_idno"] ?? []);
 $ben_mobiles = (array) ($_POST["ben_mobile"] ?? []);
-
 foreach ($ben_names as $i => $bn) {
     if (trim($bn) !== "") {
         $beneficiaries[] = [
@@ -196,7 +132,7 @@ foreach ($ben_names as $i => $bn) {
     }
 }
 
-/* ── Validate required fields ───────────────────────────────── */
+/* ── Validate required fields ────────────────────────────────── */
 $errors = [];
 if (!$fullname) {
     $errors[] = "Full name is required.";
@@ -216,7 +152,7 @@ if (!$mobile) {
 if (!$email) {
     $errors[] = "Email address is required.";
 }
-if ($email && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     $errors[] = "Please enter a valid email address.";
 }
 if (!$kra_pin) {
@@ -254,29 +190,25 @@ if (!$newsletter) {
 }
 
 if (!empty($errors)) {
-    $payload = ["status" => "error", "message" => implode(" ", $errors)];
-    log_json_error($payload, 400);
-    json_exit($payload, 400);
+    json_exit(["status" => "error", "message" => implode(" ", $errors)], 400);
 }
 
 /* Injection guard */
 if (preg_match('/(\n|\r|\t|%0A|%0D|%08|%09)/i', $email)) {
-    $payload = ["status" => "error", "message" => "Invalid input detected."];
-    log_json_error($payload, 400);
-    json_exit($payload, 400);
+    json_exit(
+        ["status" => "error", "message" => "Invalid input detected."],
+        400,
+    );
 }
 
-/* ── Duplicate check ────────────────────────────────────────── */
+/* ── Duplicate check ─────────────────────────────────────────── */
 $chk = $dbc->prepare("SELECT PID FROM tbl_membership WHERE email = :e LIMIT 1");
 $chk->execute([":e" => $email]);
 if ($chk->rowCount() > 0) {
-    $payload = ["status" => "duplicate"];
-    // Optional: log duplicates as 409
-    log_json_error($payload, 409);
-    json_exit($payload);
+    json_exit(["status" => "duplicate"]);
 }
 
-/* ── Handle file uploads ────────────────────────────────────── */
+/* ── Handle file uploads ─────────────────────────────────────── */
 $upload_dir = __DIR__ . "/uploads/membership/";
 if (!is_dir($upload_dir)) {
     mkdir($upload_dir, 0755, true);
@@ -284,14 +216,7 @@ if (!is_dir($upload_dir)) {
 
 $ref = date("Ymd") . "_" . strtoupper(substr(md5($email . time()), 0, 8));
 $app_dir = $upload_dir . $ref . "/";
-if (!is_dir($app_dir) && !mkdir($app_dir, 0755, true)) {
-    $payload = [
-        "status" => "error",
-        "message" => "Could not create application folder.",
-    ];
-    log_json_error($payload, 500);
-    json_exit($payload, 500);
-}
+mkdir($app_dir, 0755, true);
 
 $allowed_pdf = ["application/pdf"];
 $allowed_img = ["image/jpeg", "image/png"];
@@ -305,10 +230,7 @@ function save_upload(
     array $allowed_mimes,
     int $max_bytes,
 ): array {
-    if (
-        !isset($file["tmp_name"]) ||
-        ($file["error"] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK
-    ) {
+    if (!isset($file["tmp_name"]) || $file["error"] !== UPLOAD_ERR_OK) {
         return [
             "ok" => false,
             "path" => "",
@@ -374,15 +296,13 @@ if (!$upload_photo["ok"]) {
 }
 
 if (!empty($upload_errors)) {
-    $payload = [
-        "status" => "error",
-        "message" => implode(" | ", $upload_errors),
-    ];
-    log_json_error($payload, 400);
-    json_exit($payload, 400);
+    json_exit(
+        ["status" => "error", "message" => implode(" | ", $upload_errors)],
+        400,
+    );
 }
 
-/* ── Persist full application as JSON ───────────────────────── */
+/* ── Persist full application as JSON ────────────────────────── */
 $app_data = [
     "ref" => $ref,
     "dateadded" => $dateadded,
@@ -433,22 +353,22 @@ $app_data = [
         "photo" => $upload_photo["filename"] ?? "",
     ],
 ];
-
 file_put_contents(
     $app_dir . "application.json",
     json_encode($app_data, JSON_PRETTY_PRINT),
 );
 
-/* ── Save summary row to tbl_membership ─────────────────────── */
+/* ── Save basic record to tbl_membership ─────────────────────── */
+/* Split fullname into surname + othername for existing schema */
 $name_parts = explode(" ", $fullname, 2);
 $db_surname = strtoupper($name_parts[0] ?? $fullname);
 $db_othername = strtoupper($name_parts[1] ?? "");
 
 $stmt = $dbc->prepare(
-    'INSERT INTO tbl_membership
-       (surname, othername, IDno, email, mobile, postalAdd, residence, career, employer, dateadded)
+    "INSERT INTO tbl_membership
+        (surname, othername, IDno, email, mobile, postalAdd, residence, career, employer, dateadded)
      VALUES
-       (:surname,:oname,:idno,:email,:mobile,:postal,:resi,:career,:employer,:added)',
+        (:surname,:oname,:idno,:email,:mobile,:postal,:resi,:career,:employer,:added)",
 );
 $stmt->execute([
     ":surname" => $db_surname,
@@ -463,14 +383,14 @@ $stmt->execute([
     ":added" => $dateadded,
 ]);
 
-/* ── Build print URL ────────────────────────────────────────── */
+/* ── Build print URL ─────────────────────────────────────────── */
 $protocol =
     !empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off" ? "https" : "http";
 $host = $_SERVER["HTTP_HOST"];
 $print_url =
     $protocol . "://" . $host . "/print-application.php?ref=" . urlencode($ref);
 
-/* ── Email helper using PHPMailer (Composer) ────────────────── */
+/* ── Email builder ───────────────────────────────────────────── */
 function send_mail(
     string $to,
     string $to_name,
@@ -480,34 +400,24 @@ function send_mail(
 ): bool {
     $mail = new PHPMailer(true);
     try {
-        $mail->isSMTP();
+        $mail->IsSMTP();
         $mail->Host = MAIL_HOST;
         $mail->SMTPAuth = MAIL_AUTH;
         $mail->Port = MAIL_PORT;
-
-        if (MAIL_AUTH) {
-            $mail->Username = MAIL_USERNAME;
-            $mail->Password = MAIL_PASSWORD;
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; // adjust for live if needed
-        }
-
-        $mail->setFrom(MAIL_FROM, MAIL_FROM_NAME);
-        $mail->addAddress($to, $to_name);
+        $mail->Username = MAIL_USERNAME;
+        $mail->Password = MAIL_PASSWORD;
+        $mail->SetFrom(MAIL_FROM, MAIL_FROM_NAME);
+        $mail->AddAddress($to, $to_name);
         $mail->Subject = $subject;
-        $mail->isHTML(true);
+        $mail->IsHTML(true);
         $mail->Body = $body;
         $mail->AltBody = strip_tags($body);
-
         foreach ($attachments as $att) {
-            if (!empty($att["path"]) && file_exists($att["path"])) {
-                $mail->addAttachment(
-                    $att["path"],
-                    $att["name"] ?? basename($att["path"]),
-                );
+            if (file_exists($att["path"])) {
+                $mail->AddAttachment($att["path"], $att["name"]);
             }
         }
-
-        $mail->send();
+        $mail->Send();
         return true;
     } catch (Exception $e) {
         error_log("Mail error to " . $to . ": " . $e->getMessage());
@@ -515,7 +425,7 @@ function send_mail(
     }
 }
 
-/* ── Email 1: Confirmation to applicant ─────────────────────── */
+/* ── Email 1: Confirmation to applicant ──────────────────────── */
 $confirm_body =
     '
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
@@ -583,6 +493,13 @@ $confirm_body =
   </div>
 </div>';
 
+send_mail(
+    $email,
+    $fullname,
+    "Braemeg SACCO — Membership Application Received [" . $ref . "]",
+    $confirm_body,
+);
+
 /* ── Email 2: Newsletter confirmation to applicant ───────────── */
 $newsletter_body =
     '
@@ -615,6 +532,13 @@ $newsletter_body =
     <p style="color:rgba(255,255,255,0.5);font-size:12px;margin:0;">Braemeg SACCO Society Limited &nbsp;|&nbsp; Akiba Yangu, Maisha Yangu</p>
   </div>
 </div>';
+
+send_mail(
+    $email,
+    $fullname,
+    'Braemeg SACCO — You\'re on our mailing list',
+    $newsletter_body,
+);
 
 /* ── Email 3: Full application to SACCO secretariat ─────────── */
 $ben_rows = "";
@@ -776,7 +700,6 @@ $sacco_body =
     '">View Filled Application Form Online</a></p>
 </div>';
 
-/* Attachments for SACCO email */
 $attachments = [];
 if ($upload_id["ok"]) {
     $attachments[] = [
@@ -801,21 +724,6 @@ if ($upload_photo["ok"]) {
     ];
 }
 
-/* ── Send emails ────────────────────────────────────────────── */
-send_mail(
-    $email,
-    $fullname,
-    "Braemeg SACCO — Membership Application Received [" . $ref . "]",
-    $confirm_body,
-);
-
-send_mail(
-    $email,
-    $fullname,
-    "Braemeg SACCO — You're on our mailing list",
-    $newsletter_body,
-);
-
 send_mail(
     "info.braemegsacco@gmail.com",
     "Braemeg SACCO",
@@ -824,6 +732,7 @@ send_mail(
     $attachments,
 );
 
+/* BCC copies to other admins */
 send_mail(
     "braemegsacco@yahoo.com",
     "Braemeg SACCO (BCC)",
@@ -831,7 +740,7 @@ send_mail(
     $sacco_body,
 );
 
-/* ── Final JSON response ────────────────────────────────────── */
+/* ── Return success ──────────────────────────────────────────── */
 json_exit([
     "status" => "ok",
     "ref" => $ref,

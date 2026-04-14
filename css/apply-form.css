@@ -990,3 +990,11 @@ input[type="radio"]:checked + .af-consent-table__tick--no::after {
         box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
     }
 }
+/*Special field*/
+.hp-container {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
