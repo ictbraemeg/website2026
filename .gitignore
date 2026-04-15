@@ -1,1 +1,2 @@
 uploads/membership/*
+!uploads/membership/.gitkeep
