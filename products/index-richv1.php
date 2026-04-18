@@ -15,7 +15,7 @@ $rcs = $qry->fetch(PDO::FETCH_ASSOC);
 /* ── Fetch loans (preview up to 4) ──────────────────────────── */
 $loans_qry = $dbc->prepare(
     "SELECT PID, title FROM tbl_products
-     WHERE published = '1' AND LOWER(menuid) = 'loans'
+     WHERE published = '1' AND menuid = 'Loans'
      ORDER BY title ASC LIMIT 4",
 );
 $loans_qry->execute();
@@ -24,7 +24,7 @@ $loans = $loans_qry->fetchAll(PDO::FETCH_ASSOC);
 /* ── Fetch savings (preview up to 4) ────────────────────────── */
 $savings_qry = $dbc->prepare(
     "SELECT PID, title FROM tbl_products
-     WHERE published = '1' AND LOWER(menuid) = 'savings'
+     WHERE published = '1' AND menuid = 'Savings'
      ORDER BY title ASC LIMIT 4",
 );
 $savings_qry->execute();
@@ -121,7 +121,7 @@ $sidebar_items = [
                 </div>
 
                 <!-- ── LOANS SECTION ─────────────────────────────── -->
-                <div class="phr-section animate-on-scroll" role="region" aria-labelledby="loans-heading">
+                <section class="phr-section animate-on-scroll" aria-labelledby="loans-heading">
                     <div class="phr-section__head">
                         <div class="phr-section__head-text">
                             <div class="phr-section__badge phr-section__badge--loans">
@@ -164,18 +164,25 @@ $sidebar_items = [
                             <span class="phr-card__arrow" aria-hidden="true">→</span>
                         </a>
                         <?php endforeach; ?>
+
+                        <!-- "See all" tile -->
+                        <a href="loan-products.php" class="phr-card phr-card--more">
+                            <span class="phr-card__emoji" aria-hidden="true">📂</span>
+                            <span class="phr-card__title">All loan products</span>
+                            <span class="phr-card__arrow" aria-hidden="true">→</span>
+                        </a>
                     </div>
                     <?php else: ?>
                     <div class="phr-empty">
                         <a href="loan-products.php" class="btn-ghost">Browse loan products →</a>
                     </div>
                     <?php endif; ?>
-                </div>
+                </section>
 
                 <div class="content-divider"></div>
 
                 <!-- ── SAVINGS SECTION ───────────────────────────── -->
-                <div class="phr-section animate-on-scroll" role="region" aria-labelledby="savings-heading">
+                <section class="phr-section animate-on-scroll" aria-labelledby="savings-heading">
                     <div class="phr-section__head">
                         <div class="phr-section__head-text">
                             <div class="phr-section__badge phr-section__badge--savings">
@@ -218,13 +225,19 @@ $sidebar_items = [
                             <span class="phr-card__arrow" aria-hidden="true">→</span>
                         </a>
                         <?php endforeach; ?>
+
+                        <a href="savings-products.php" class="phr-card phr-card--more">
+                            <span class="phr-card__emoji" aria-hidden="true">📂</span>
+                            <span class="phr-card__title">All savings products</span>
+                            <span class="phr-card__arrow" aria-hidden="true">→</span>
+                        </a>
                     </div>
                     <?php else: ?>
                     <div class="phr-empty">
                         <a href="savings-products.php" class="btn-ghost">Browse savings products →</a>
                     </div>
                     <?php endif; ?>
-                </div>
+                </section>
 
                 <div class="content-divider"></div>
 
@@ -404,6 +417,15 @@ $sidebar_items = [
     color: #5a3e00;
 }
 
+/* "See all" tile — slightly muted */
+.phr-card--more {
+    border-style: dashed;
+    color: var(--color-text-muted);
+}
+
+.phr-card--more:hover {
+    border-style: solid;
+}
 
 .phr-card__emoji {
     font-size: 1.3rem;
