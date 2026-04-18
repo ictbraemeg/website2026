@@ -15,7 +15,7 @@ $rcs = $qry->fetch(PDO::FETCH_ASSOC);
 /* ── Fetch loans (preview up to 4) ──────────────────────────── */
 $loans_qry = $dbc->prepare(
     "SELECT PID, title FROM tbl_products
-     WHERE published = '1' AND LOWER(menuid) = 'loans'
+     WHERE published = '1' AND menuid = 'Loans'
      ORDER BY title ASC LIMIT 4",
 );
 $loans_qry->execute();
@@ -24,7 +24,7 @@ $loans = $loans_qry->fetchAll(PDO::FETCH_ASSOC);
 /* ── Fetch savings (preview up to 4) ────────────────────────── */
 $savings_qry = $dbc->prepare(
     "SELECT PID, title FROM tbl_products
-     WHERE published = '1' AND LOWER(menuid) = 'savings'
+     WHERE published = '1' AND menuid = 'Savings'
      ORDER BY title ASC LIMIT 4",
 );
 $savings_qry->execute();
