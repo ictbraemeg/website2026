@@ -2,61 +2,68 @@
 /**
  * information-center/news-updates.php
  */
-require_once '../config/shikisho.php';
+require_once "../config/shikisho.php";
 
 $qry = $dbc->prepare("SELECT * FROM tbl_company WHERE published='1' LIMIT 1");
 $qry->execute();
 $rcs = $qry->fetch(PDO::FETCH_ASSOC);
 
-$per_page   = 9;
-$current_pg = max(1, (int)($_GET['pg'] ?? 1));
-$offset     = ($current_pg - 1) * $per_page;
+$per_page = 9;
+$current_pg = max(1, (int) ($_GET["pg"] ?? 1));
+$offset = ($current_pg - 1) * $per_page;
 
-$total_qry = $dbc->prepare("SELECT COUNT(*) FROM tbl_news WHERE published='1'");
+$total_qry = $dbc->prepare(
+    "SELECT COUNT(*) FROM tbl_blog_posts WHERE published='1'",
+);
 $total_qry->execute();
-$total = (int)$total_qry->fetchColumn();
-$total_pages = (int)ceil($total / $per_page);
+$total = (int) $total_qry->fetchColumn();
+$total_pages = (int) ceil($total / $per_page);
 
 $news_qry = $dbc->prepare(
-    "SELECT * FROM tbl_news WHERE published='1' ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
+    "SELECT * FROM tbl_blog_posts WHERE published='1' ORDER BY postDate DESC LIMIT :limit OFFSET :offset",
 );
-$news_qry->bindValue(':limit',  $per_page, PDO::PARAM_INT);
-$news_qry->bindValue(':offset', $offset,   PDO::PARAM_INT);
+$news_qry->bindValue(":limit", $per_page, PDO::PARAM_INT);
+$news_qry->bindValue(":offset", $offset, PDO::PARAM_INT);
 $news_qry->execute();
 $news_items = $news_qry->fetchAll(PDO::FETCH_ASSOC);
 
-$nav_base   = '../';
-$nav_active = 'info';
-$page_title = 'News & Updates — ' . htmlspecialchars($rcs['name']);
+$nav_base = "../";
+$nav_active = "info";
+$page_title = "News & Updates — " . htmlspecialchars($rcs["name"]);
 
-$page_heading = 'Information Center';
-$page_sub     = 'Stay up to date with the latest news and announcements from Braemeg SACCO.';
-$breadcrumbs  = [
-    ['label' => 'Home',               'href' => '../index.php'],
-    ['label' => 'Information Center', 'href' => 'general-information.php'],
-    ['label' => 'News & Updates'],
+$page_heading = "Information Center";
+$page_sub =
+    "Stay up to date with the latest news and announcements from Braemeg SACCO.";
+$breadcrumbs = [
+    ["label" => "Home", "href" => "../index.php"],
+    ["label" => "Information Center", "href" => "general-information.php"],
+    ["label" => "News & Updates"],
 ];
 
-$sidebar_title = 'Information Center';
+$sidebar_title = "Information Center";
 $sidebar_items = [
-    ['label' => 'General Information', 'href' => 'general-information.php'],
-    ['label' => 'News & Updates',      'href' => 'news-updates.php', 'active' => true],
+    ["label" => "General Information", "href" => "general-information.php"],
+    [
+        "label" => "News & Updates",
+        "href" => "news-updates.php",
+        "active" => true,
+    ],
 ];
 ?>
 <!DOCTYPE html>
 <html lang="en">
-<head><?php include '../includes/head.php'; ?></head>
+<head><?php include "../includes/head.php"; ?></head>
 <body>
 
-<?php include '../includes/topbar.php'; ?>
-<?php include '../includes/navbar.php'; ?>
-<?php include '../includes/page-header.php'; ?>
+<?php include "../includes/topbar.php"; ?>
+<?php include "../includes/navbar.php"; ?>
+<?php include "../includes/page-header.php"; ?>
 
 <div class="inner-page">
     <div class="container">
         <div class="inner-page__layout">
 
-            <?php include '../includes/section-sidebar.php'; ?>
+            <?php include "../includes/section-sidebar.php"; ?>
 
             <main class="inner-page__content" id="main-content">
 
@@ -69,29 +76,55 @@ $sidebar_items = [
                 <div class="news-grid">
                     <?php foreach ($news_items as $item): ?>
                     <article class="news-card animate-on-scroll">
-                        <?php if (!empty($item['imagePath'])): ?>
+                        <?php if (!empty($item["postImage"])): ?>
                         <div class="news-card__thumb">
-                            <img src="../images/gallery/<?php echo htmlspecialchars($item['imagePath']); ?>"
-                                 alt="<?php echo htmlspecialchars($item['title']); ?>"
+                            <img src="../images/gallery/<?php echo htmlspecialchars(
+                                $item["postImage"],
+                            ); ?>"
+                                 alt="<?php echo htmlspecialchars(
+                                     $item["postTitle"],
+                                 ); ?>"
                                  class="news-card__img"
                                  loading="lazy">
                         </div>
                         <?php endif; ?>
                         <div class="news-card__body">
-                            <?php if (!empty($item['created_at'])): ?>
-                            <time class="news-card__date" datetime="<?php echo $item['created_at']; ?>">
-                                <?php echo date('d M Y', strtotime($item['created_at'])); ?>
+                            <?php if (!empty($item["postDate"])): ?>
+                            <time class="news-card__date" datetime="<?php echo htmlspecialchars(
+                                $item["postDate"],
+                            ); ?>">
+                                <?php
+                                $ts = strtotime($item["postDate"]);
+                                echo $ts
+                                    ? date("d M Y", $ts)
+                                    : htmlspecialchars($item["postDate"]);
+                                ?>
                             </time>
                             <?php endif; ?>
                             <h3 class="news-card__title">
-                                <a href="news-updates.php?page=<?php echo (int)$item['PID']; ?>">
-                                    <?php echo htmlspecialchars($item['title']); ?>
+                                <a href="news-updates.php?page=<?php echo (int) $item[
+                                    "PID"
+                                ]; ?>">
+                                    <?php echo htmlspecialchars(
+                                        $item["postTitle"],
+                                    ); ?>
                                 </a>
                             </h3>
                             <p class="news-card__excerpt">
-                                <?php echo htmlspecialchars(substr(strip_tags($item['body'] ?? $item['description'] ?? ''), 0, 120)); ?>…
+                                <?php echo htmlspecialchars(
+                                    substr(
+                                        strip_tags(
+                                            $item["postContent"] ??
+                                                ($item["postDesc"] ?? ""),
+                                        ),
+                                        0,
+                                        120,
+                                    ),
+                                ); ?>…
                             </p>
-                            <a href="news-updates.php?page=<?php echo (int)$item['PID']; ?>" class="article-card__link">
+                            <a href="news-updates.php?page=<?php echo (int) $item[
+                                "PID"
+                            ]; ?>" class="article-card__link">
                                 Read More
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                             </a>
@@ -104,8 +137,12 @@ $sidebar_items = [
                 <nav class="pagination" aria-label="Page navigation">
                     <?php for ($p = 1; $p <= $total_pages; $p++): ?>
                     <a href="?pg=<?php echo $p; ?>"
-                       class="pagination__btn <?php echo $p === $current_pg ? 'pagination__btn--active' : ''; ?>"
-                       <?php echo $p === $current_pg ? 'aria-current="page"' : ''; ?>>
+                       class="pagination__btn <?php echo $p === $current_pg
+                           ? "pagination__btn--active"
+                           : ""; ?>"
+                       <?php echo $p === $current_pg
+                           ? 'aria-current="page"'
+                           : ""; ?>>
                         <?php echo $p; ?>
                     </a>
                     <?php endfor; ?>
@@ -124,7 +161,7 @@ $sidebar_items = [
     </div>
 </div>
 
-<?php include '../includes/footer.php'; ?>
+<?php include "../includes/footer.php"; ?>
 <script src="../js/main.js"></script>
 </body>
 </html>
